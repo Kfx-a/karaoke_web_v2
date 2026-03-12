@@ -106,29 +106,28 @@ export const PlayerGrid: React.FC = () => {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8"
           >
-            {/* Backdrop with animated blur */}
-            <motion.div 
-              initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-              animate={{ opacity: 1, backdropFilter: 'blur(16px)' }}
-              exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-              transition={{ duration: 0.5 }}
+            {/* Backdrop — static blur via CSS, only opacity animated */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
               onClick={() => setSelectedVideo(null)}
-              className="absolute inset-0 bg-white/20 dark:bg-black/40"
+              className="absolute inset-0 bg-white/20 dark:bg-black/60 backdrop-blur-md"
             />
 
-            {/* Modal Content */}
+            {/* Modal Content — backdropFilter static, only transform+opacity animated */}
             <motion.div
-              initial={{ scale: 0.7, opacity: 0, y: 50, backdropFilter: 'blur(0px)' }}
-              animate={{ scale: 1, opacity: 1, y: 0, backdropFilter: 'blur(24px)' }}
-              exit={{ scale: 0.7, opacity: 0, y: 50, backdropFilter: 'blur(0px)' }}
-              transition={{ 
-                type: "spring", 
-                damping: 28, 
+              initial={{ scale: 0.7, opacity: 0, y: 50 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.7, opacity: 0, y: 50 }}
+              transition={{
+                type: "spring",
+                damping: 28,
                 stiffness: 180,
-                opacity: { duration: 0.4 },
-                backdropFilter: { duration: 0.5 }
+                opacity: { duration: 0.3 },
               }}
-              className="relative w-full max-w-[95vw] md:max-w-[60vw] bg-white/80 dark:bg-zinc-900/80 rounded-xl p-4 md:p-6 shadow-[0_50px_120px_rgba(0,0,0,0.5)] border border-white/30 dark:border-white/10 flex flex-col items-center overflow-hidden"
+              className="relative w-full max-w-[95vw] md:max-w-[60vw] bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-xl p-4 md:p-6 shadow-[0_50px_120px_rgba(0,0,0,0.5)] border border-white/30 dark:border-white/10 flex flex-col items-center overflow-hidden"
             >
               <div className="w-full flex flex-col gap-6 items-center">
                 {/* Video Container - Centered with flex and no background to avoid artifacts */}

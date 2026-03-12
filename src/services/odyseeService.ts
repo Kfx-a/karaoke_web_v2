@@ -16,7 +16,40 @@ export interface OdyseeVideo {
   embed_url: string;
 }
 
+const CACHE_KEY = 'odysee_videos_cache';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry {
+  data: OdyseeVideo[];
+  timestamp: number;
+}
+
+function getCached(channel: string): OdyseeVideo[] | null {
+  try {
+    const raw = sessionStorage.getItem(`${CACHE_KEY}_${channel}`);
+    if (!raw) return null;
+    const entry: CacheEntry = JSON.parse(raw);
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null;
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCache(channel: string, data: OdyseeVideo[]) {
+  try {
+    const entry: CacheEntry = { data, timestamp: Date.now() };
+    sessionStorage.setItem(`${CACHE_KEY}_${channel}`, JSON.stringify(entry));
+  } catch {
+    // sessionStorage may be unavailable (private mode, quota exceeded)
+  }
+}
+
 export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVideo[]> {
+  // Return cached data if fresh
+  const cached = getCached(channelName);
+  if (cached) return cached;
+
   const PROXY_URL = 'https://api.na-backend.odysee.com/api/v1/proxy';
 
   try {
@@ -62,14 +95,14 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
     const searchData = await searchResponse.json();
     const claims = searchData.result?.items || [];
 
-    return claims.map((claim: any) => {
+    const videos: OdyseeVideo[] = claims.map((claim: any) => {
       const metadata = claim.value || {};
       const durationSeconds = metadata.video?.duration || metadata.audio?.duration || 0;
       const minutes = Math.floor(durationSeconds / 60);
       const seconds = Math.floor(durationSeconds % 60);
-      
+
       const canonicalPath = claim.canonical_url.replace('lbry://', '').replace(/#/g, ':');
-      
+
       return {
         id: claim.claim_id,
         name: claim.name,
@@ -81,6 +114,9 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
         embed_url: `https://odysee.com/$/embed/${canonicalPath}?autoplay=true`,
       };
     });
+
+    setCache(channelName, videos);
+    return videos;
   } catch (error) {
     console.error('Error fetching Odysee videos:', error);
     return [];
