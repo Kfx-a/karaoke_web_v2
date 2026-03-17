@@ -29,7 +29,7 @@ export const PlayerGrid: React.FC = () => {
     loadVideos();
   }, []);
 
-  const filteredVideos = videos.filter(v => 
+  const filteredVideos = videos.filter(v =>
     v.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -80,9 +80,9 @@ export const PlayerGrid: React.FC = () => {
                 }}
                 transition={{ type: "spring", stiffness: 100, damping: 15 }}
               >
-                <GlassCard 
+                <GlassCard
                   title={video.title}
-                  artist="@Alis_FX"
+                  /*artist="_FX"*/
                   thumbnail={video.thumbnail}
                   duration={video.duration}
                   onClick={() => setSelectedVideo(video)}
@@ -141,28 +141,23 @@ export const PlayerGrid: React.FC = () => {
                     loading="lazy"
                     style={{ background: 'transparent' }}
                   />
-                  
+
                   {/* Block Title Bar Overlay */}
                   <div className="absolute top-0 left-0 w-full h-[60px] bg-transparent z-10 pointer-events-auto cursor-default" />
                 </div>
-                
+
                 {/* Info Section */}
                 <div className="w-full px-2 pb-2 text-left">
                   <h2 className="text-lg md:text-xl font-bold text-black dark:text-white">
                     {selectedVideo.title}
                   </h2>
-                  <div className="flex items-center gap-2 mt-1 text-black/50 dark:text-white/40 text-[11px] md:text-xs font-medium">
-                    <span>@Alis_FX</span>
-                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
-                    <span>2y ago</span>
-                  </div>
                 </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* Footer */}
       <footer className="mt-32 pt-12 border-t border-black/5 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-8 text-black/20 dark:text-white/20 text-xs font-mono uppercase tracking-widest">
         <div className="flex items-center gap-8">
@@ -170,7 +165,7 @@ export const PlayerGrid: React.FC = () => {
           <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Terms</a>
           <a href="#" className="hover:text-black dark:hover:text-white transition-colors">Support</a>
         </div>
-        <p>© 2026 Alis FX. All rights reserved.</p>
+        <p>© 2026 Alis FX.</p>
       </footer>
     </div>
   );
