@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './GlassCard';
-import { Loader2, X, Search } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { fetchOdyseeVideos, type OdyseeVideo } from '../services/odyseeService';
 
-export const PlayerGrid: React.FC = () => {
+export const PlayerGrid: React.FC<{ searchQuery: string }> = ({ searchQuery }) => {
   const [videos, setVideos] = useState<OdyseeVideo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<OdyseeVideo | null>(null);
 
   useEffect(() => {
@@ -35,19 +34,8 @@ export const PlayerGrid: React.FC = () => {
 
   return (
     <div className="max-w-[2400px] mx-auto px-6 py-24">
-      {/* Search Section */}
-      <div className="flex justify-center mb-24">
-        <div className="relative group w-full max-w-xl">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-black/30 dark:text-white/30 group-focus-within:text-purple-500 transition-colors" />
-          <input
-            type="text"
-            placeholder="Search videos..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-16 pl-16 pr-8 rounded-3xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-black dark:text-white text-lg placeholder:text-black/20 dark:placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:bg-black/10 dark:focus:bg-white/10 transition-all w-full shadow-lg"
-          />
-        </div>
-      </div>
+      <div inert={selectedVideo ? true : undefined} className={selectedVideo ? "pointer-events-none select-none" : ""}>
+      {/* Search Section Removed */}
 
       {/* Grid Section */}
       {loading ? (
@@ -96,6 +84,7 @@ export const PlayerGrid: React.FC = () => {
           )}
         </motion.div>
       )}
+      </div>
 
       {/* Video Modal */}
       <AnimatePresence>
@@ -158,6 +147,7 @@ export const PlayerGrid: React.FC = () => {
         )}
       </AnimatePresence>
 
+      <div inert={selectedVideo ? true : undefined} className={selectedVideo ? "pointer-events-none select-none" : ""}>
       {/* Footer */}
       <footer className="mt-32 pt-12 border-t border-black/5 dark:border-white/5 flex flex-col md:flex-row items-center justify-between gap-8 text-black/20 dark:text-white/20 text-xs font-mono uppercase tracking-widest">
         <div className="flex items-center gap-8">
@@ -167,6 +157,7 @@ export const PlayerGrid: React.FC = () => {
         </div>
         <p>© 2026 Alis FX.</p>
       </footer>
+      </div>
     </div>
   );
 };
