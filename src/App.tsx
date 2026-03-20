@@ -67,6 +67,9 @@ export default function App() {
               setIsSearchOpen(false);
             }
           }}
+          tabIndex={isSearchOpen ? 0 : -1}
+          inputMode={isSearchOpen ? 'text' : 'none'}
+          aria-hidden={!isSearchOpen}
           className={`h-12 w-full bg-transparent pl-12 pr-10 text-black dark:text-white text-sm placeholder:text-black/40 dark:placeholder:text-white/40 focus:outline-none transition-opacity duration-300 ${
             isSearchOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 select-none pointer-events-none'
           }`}
