@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './GlassCard';
 import { Loader2, X } from 'lucide-react';
@@ -8,10 +8,43 @@ export const PlayerGrid: React.FC<{ searchQuery: string }> = ({ searchQuery }) =
   const [videos, setVideos] = useState<OdyseeVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<OdyseeVideo | null>(null);
+  const historyPushedRef = useRef(false);
+
+  // Stable close function that pops history instead of setting state directly
+  const closeModal = useCallback(() => {
+    if (historyPushedRef.current) {
+      historyPushedRef.current = false;
+      history.back(); // triggers popstate → which sets selectedVideo(null)
+    } else {
+      setSelectedVideo(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedVideo) {
       document.body.style.overflow = 'hidden';
+
+      // Push a history entry so Android back button can close the modal
+      history.pushState({ modalOpen: true }, '');
+      historyPushedRef.current = true;
+
+      const onPopState = () => {
+        historyPushedRef.current = false;
+        setSelectedVideo(null);
+      };
+
+      window.addEventListener('popstate', onPopState);
+
+      return () => {
+        window.removeEventListener('popstate', onPopState);
+        document.body.style.overflow = 'unset';
+
+        // If modal closes without back button (e.g. clicking X), clean up the history entry
+        if (historyPushedRef.current) {
+          historyPushedRef.current = false;
+          history.back();
+        }
+      };
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -101,7 +134,7 @@ export const PlayerGrid: React.FC<{ searchQuery: string }> = ({ searchQuery }) =
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              onClick={() => setSelectedVideo(null)}
+              onClick={() => closeModal()}
               className="absolute inset-0 bg-white/20 dark:bg-black/60 backdrop-blur-md"
             />
 
@@ -128,6 +161,7 @@ export const PlayerGrid: React.FC<{ searchQuery: string }> = ({ searchQuery }) =
                     allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share; fullscreen"
                     referrerPolicy="no-referrer-when-downgrade"
                     loading="lazy"
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
                     style={{ background: 'transparent' }}
                   />
 
