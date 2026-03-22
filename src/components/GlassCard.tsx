@@ -10,7 +10,7 @@ function cn(...inputs: ClassValue[]) {
 
 interface GlassCardProps {
   title: string;
-  artist: string;
+  artist?: string;
   thumbnail: string;
   duration: string;
   className?: string;

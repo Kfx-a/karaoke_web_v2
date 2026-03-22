@@ -14,6 +14,25 @@ export interface OdyseeVideo {
   release_time: string;
   canonical_url: string;
   embed_url: string;
+  description: string;
+}
+
+/**
+ * Returns a numeric priority for a video based on its description tag:
+ *   0 = [S] (alta prioridad)
+ *   1 = [A] (normal)
+ *   2 = sin tag (última)
+ */
+function getPriority(description: string): number {
+  const lower = description.trimStart().toLowerCase();
+  if (lower.startsWith('[s]')) return 0;
+  if (lower.startsWith('[a]')) return 1;
+  return 2;
+}
+
+/** Sort an array of OdyseeVideo by description-based priority (stable sort). */
+export function sortByPriority(videos: OdyseeVideo[]): OdyseeVideo[] {
+  return [...videos].sort((a, b) => getPriority(a.description) - getPriority(b.description));
 }
 
 const CACHE_KEY = 'odysee_videos_cache';
@@ -83,7 +102,7 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
         params: {
           channel_ids: [channelId],
           order_by: ['release_time'],
-          page_size: 20,
+          page_size: 200,
           no_totals: true,
           claim_type: ['stream'],
           has_source: true,
@@ -112,6 +131,7 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
         release_time: claim.meta?.release_time || claim.timestamp,
         canonical_url: `https://odysee.com/${canonicalPath}`,
         embed_url: `https://odysee.com/$/embed/${canonicalPath}?autoplay=true`,
+        description: metadata.description || '',
       };
     });
 
