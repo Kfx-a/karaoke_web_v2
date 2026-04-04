@@ -18,6 +18,17 @@
   <meta name="twitter:title" content="Personal gallery" />
   <meta name="twitter:description" content="Galería personal y reproductor web" />
   <meta name="twitter:image" content="https://raw.githubusercontent.com/Kfx-a/openg/main/oprng.jpg" />
+
+  <!-- Theme Initialization to prevent FOUC -->
+  <script>
+    try {
+      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (_) {}
+  </script>
 </head>
 
 <body>
