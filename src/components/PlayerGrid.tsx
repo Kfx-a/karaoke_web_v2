@@ -190,6 +190,7 @@ export const PlayerGrid: React.FC<{ searchQuery: string }> = ({ searchQuery }) =
                           thumbnail={video.thumbnail}
                           duration={video.duration}
                           onClick={() => setSelectedVideo(video)}
+                          priority={idx < 8}
                         />
                       </motion.div>
                     ))

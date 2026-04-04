@@ -15,9 +15,10 @@ interface GlassCardProps {
   duration: string;
   className?: string;
   onClick?: () => void;
+  priority?: boolean;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ title, artist, thumbnail, duration, className, onClick }) => {
+export const GlassCard: React.FC<GlassCardProps> = ({ title, artist, thumbnail, duration, className, onClick, priority = false }) => {
   return (
     <div
       className={cn("group flex flex-col gap-3 cursor-pointer", className)}
@@ -40,12 +41,12 @@ export const GlassCard: React.FC<GlassCardProps> = ({ title, artist, thumbnail, 
         {/* Gradient overlay on hover — CSS only, no JS */}
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-        {/* Thumbnail — lazy loaded */}
+        {/* Thumbnail — respects priority for lazy loading */}
         <div className="absolute inset-0 overflow-hidden">
           <img
             src={thumbnail}
             alt={title}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
             decoding="async"
             className="w-full h-full object-cover opacity-90 dark:opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
             referrerPolicy="no-referrer"

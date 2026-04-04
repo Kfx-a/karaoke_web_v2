@@ -121,12 +121,13 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
       const seconds = Math.floor(durationSeconds % 60);
 
       const canonicalPath = claim.canonical_url.replace('lbry://', '').replace(/#/g, ':');
+      const rawThumbnail = metadata.thumbnail?.url || `https://picsum.photos/seed/${claim.claim_id}/800/1000`;
 
       return {
         id: claim.claim_id,
         name: claim.name,
         title: metadata.title || 'Untitled',
-        thumbnail: metadata.thumbnail?.url || `https://picsum.photos/seed/${claim.claim_id}/800/1000`,
+        thumbnail: `https://wsrv.nl/?url=${encodeURIComponent(rawThumbnail)}&w=640&output=webp&q=80&we`,
         duration: `${minutes}:${seconds.toString().padStart(2, '0')}`,
         release_time: claim.meta?.release_time || claim.timestamp,
         canonical_url: `https://odysee.com/${canonicalPath}`,
