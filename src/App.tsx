@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { LiquidBackground } from './components/LiquidBackground';
 import { PlayerGrid } from './components/PlayerGrid';
 import { Sun, Moon, Search, X } from 'lucide-react';
@@ -104,6 +105,7 @@ export default function App() {
       </div>
 
       <PlayerGrid searchQuery={searchQuery} />
+      <Analytics />
     </main>
   );
 }
