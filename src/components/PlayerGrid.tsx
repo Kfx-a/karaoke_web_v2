@@ -212,7 +212,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
               >
                 {pageVideos.length > 0 ? (
                   pageVideos.map((video, idx) => (
@@ -278,7 +278,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
                 {showPlayerFrame && (
                   <iframe
                     key={selectedVideo.id}
-                    src={selectedVideo.embed_url}
+                    src={`${selectedVideo.embed_url}?autoplay=1`}
                     title={selectedVideo.title}
                     className="modal-video-frame"
                     allowFullScreen
