@@ -56,6 +56,10 @@ interface OdyseeApiResponse<T> {
   data: T;
 }
 
+interface ViewCountsResponse {
+  counts?: Record<string, number | null>;
+}
+
 const CACHE_KEY = 'odysee_videos_cache_v3';
 const AUTH_TOKEN_KEY = 'odysee_anonymous_auth_token';
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -194,6 +198,21 @@ async function fetchViewCount(claimId: string, authToken: string): Promise<numbe
   }
 }
 
+async function fetchViewCountsFromServer(claimIds: string[]): Promise<Record<string, number | null> | null> {
+  try {
+    const url = new URL('/api/odysee-view-counts', window.location.origin);
+    url.searchParams.set('claim_ids', claimIds.join(','));
+
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = await response.json() as ViewCountsResponse;
+    return data.counts || null;
+  } catch {
+    return null;
+  }
+}
+
 function formatDuration(durationSeconds = 0): string {
   const minutes = Math.floor(durationSeconds / 60);
   const seconds = Math.floor(durationSeconds % 60);
@@ -228,6 +247,14 @@ function mapClaimToVideo(claim: OdyseeClaim, index: number): OdyseeVideo {
 
 async function attachViewCounts(videos: OdyseeVideo[]): Promise<OdyseeVideo[]> {
   try {
+    const serverCounts = await fetchViewCountsFromServer(videos.map(video => video.id));
+    if (serverCounts) {
+      return videos.map(video => ({
+        ...video,
+        view_count: typeof serverCounts[video.id] === 'number' ? serverCounts[video.id] : null,
+      }));
+    }
+
     const authToken = await getOdyseeAuthToken();
     return Promise.all(
       videos.map(async (video) => ({
