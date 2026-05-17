@@ -1,23 +1,21 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Personal gallery</title>
+  <title>Karaoke FX Gallery</title>
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="WEB SITE URL " />
-  <meta property="og:title" content="Personal gallery" />
-  <meta property="og:description" content="Galería personal y reproductor web" />
-  <meta property="og:image" content="https://raw.githubusercontent.com/Kfx-a/openg/main/oprng.jpg" />
+  <meta property="og:url" content="https://kfx-a.github.io/karaoke_web_v2/" />
+  <meta property="og:title" content="Karaoke FX Gallery" />
+  <meta property="og:description" content="Karaoke FX Gallery" />
 
   <!-- Twitter (X) -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Personal gallery" />
-  <meta name="twitter:description" content="Galería personal y reproductor web" />
-  <meta name="twitter:image" content="https://raw.githubusercontent.com/Kfx-a/openg/main/oprng.jpg" />
+  <meta name="twitter:title" content="Karaoke FX Gallery" />
+  <meta name="twitter:description" content="Karaoke FX Gallery" />
 
   <!-- Theme Initialization to prevent FOUC -->
   <script>
@@ -32,6 +30,126 @@
 </head>
 
 <body>
+  <!-- PRELOADER -->
+  <style>
+    body { background: #0a0510; margin: 0; }
+    body.preloading { overflow: hidden; }
+
+    #preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(0, 229, 255, 0.12), transparent 28rem),
+        #05020d;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.45s ease-out, visibility 0.45s ease-out;
+    }
+
+    .loader-wrapper { display: none; }
+
+    .bar {
+      position: relative;
+      width: 100%;
+      height: 90px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: transparent;
+    }
+
+    .bar::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 100%;
+      height: 2px;
+      border-radius: 999px;
+      background: linear-gradient(90deg,
+          transparent 0%,
+          rgba(0, 229, 255, 0.18) 18%,
+          rgba(116, 247, 255, 0.95) 46%,
+          #ffffff 50%,
+          rgba(116, 247, 255, 0.95) 54%,
+          rgba(0, 163, 255, 0.18) 82%,
+          transparent 100%);
+      box-shadow:
+        0 0 10px rgba(116, 247, 255, 1),
+        0 0 26px rgba(0, 229, 255, 0.95),
+        0 0 56px rgba(0, 163, 255, 0.72);
+      transform: translate(-50%, -50%) scaleX(0.28);
+      animation: loader-line 1.35s ease-in-out infinite;
+    }
+
+    .bar::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 52%;
+      height: 52px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(ellipse at center,
+          rgba(116, 247, 255, 0.82) 0%,
+          rgba(0, 229, 255, 0.38) 34%,
+          rgba(0, 96, 255, 0.16) 58%,
+          transparent 74%);
+      filter: blur(12px);
+      opacity: 0.95;
+      animation: loader-glow 1.35s ease-in-out infinite;
+    }
+
+    .loader-label {
+      position: absolute;
+      bottom: 0;
+      color: rgba(170, 242, 255, 0.62);
+      font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      animation: loader-text 1.15s ease-in-out infinite;
+    }
+
+    @keyframes loader-line {
+      0%, 100% { transform: translate(-50%, -50%) scaleX(0.18); opacity: 0.56; }
+      50% { transform: translate(-50%, -50%) scaleX(1); opacity: 1; }
+    }
+
+    @keyframes loader-glow {
+      0%, 100% { transform: translate(-50%, -50%) scaleX(0.45); opacity: 0.34; }
+      50% { transform: translate(-50%, -50%) scaleX(1); opacity: 0.98; }
+    }
+
+    @keyframes loader-text {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 0.8; }
+    }
+
+    .hidden { display: none !important; }
+  </style>
+
+  <div id="preloader">
+      <div class="loader-wrapper">
+          <div class="bar"></div>
+          <div class="loader-label">Loading</div>
+      </div>
+  </div>
+  <script type="text/javascript">
+      var wrapperDiv = document.getElementById("preloader");
+      if (wrapperDiv) {
+          document.body.classList.add("preloading");
+          window.hideWebflowPreloader = function() {
+              wrapperDiv.style.opacity = "0";
+              setTimeout(function() {
+                  wrapperDiv.classList.add("hidden");
+                  document.body.classList.remove("preloading");
+                  document.body.style.overflow = 'auto';
+              }, 600);
+          }
+      }
+  </script>
+
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
