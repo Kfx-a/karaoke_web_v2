@@ -1,10 +1,49 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './GlassCard';
-import { Loader2, ChevronLeft, ChevronRight, Search, Sun, Moon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Sun, Moon } from 'lucide-react';
 import { fetchOdyseeVideos, sortByPriority, type OdyseeVideo } from '../services/odyseeService';
 
 const VIDEOS_PER_PAGE = 20;
+const THUMBNAIL_PRELOAD_TIMEOUT_MS = 10000;
+const TEST_EMBED_VIDEOS: OdyseeVideo[] = [
+  {
+    id: 'youtube-test-NvccnhoXPQ4',
+    name: 'youtube-test-NvccnhoXPQ4',
+    title: 'YouTube test',
+    thumbnail: 'https://img.youtube.com/vi/NvccnhoXPQ4/hqdefault.jpg',
+    duration: 'YT',
+    view_count: null,
+    release_time: '',
+    canonical_url: 'https://www.youtube-nocookie.com/embed/NvccnhoXPQ4?si=6y6cYboviDiLGzva',
+    embed_url: 'https://www.youtube-nocookie.com/embed/NvccnhoXPQ4?si=6y6cYboviDiLGzva',
+    description: '[test]',
+  },
+  {
+    id: 'dailymotion-test-x2zw06g',
+    name: 'dailymotion-test-x2zw06g',
+    title: 'Dailymotion test',
+    thumbnail: 'https://www.dailymotion.com/thumbnail/video/x2zw06g',
+    duration: 'DM',
+    view_count: null,
+    release_time: '',
+    canonical_url: 'https://geo.dailymotion.com/player.html?video=x2zw06g',
+    embed_url: 'https://geo.dailymotion.com/player.html?video=x2zw06g',
+    description: '[test]',
+  },
+  {
+    id: 'vimeo-test-133230974',
+    name: 'vimeo-test-133230974',
+    title: 'Etotama Opening Karaoke AFX',
+    thumbnail: 'https://vumbnail.com/133230974.jpg',
+    duration: 'VM',
+    view_count: null,
+    release_time: '',
+    canonical_url: 'https://player.vimeo.com/video/133230974?badge=0&autopause=0&player_id=0&app_id=58479',
+    embed_url: 'https://player.vimeo.com/video/133230974?badge=0&autopause=0&player_id=0&app_id=58479',
+    description: '[test]',
+  },
+];
 
 interface PaginationProps {
   currentPage: number;
@@ -75,14 +114,74 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
 
 interface PlayerGridProps {
   isDark?: boolean;
+  revealContent?: boolean;
+  onInitialContentReady?: () => void;
   onToggleTheme?: () => void;
 }
 
-export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleTheme }) => {
+function preloadImage(src: string): Promise<void> {
+  return new Promise(resolve => {
+    const image = new Image();
+    let settled = false;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      resolve();
+    };
+
+    const timer = window.setTimeout(finish, THUMBNAIL_PRELOAD_TIMEOUT_MS);
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.onload = finish;
+    image.onerror = finish;
+    image.src = src;
+  });
+}
+
+async function preloadInitialThumbnails(videos: OdyseeVideo[]) {
+  await Promise.all(videos.slice(0, VIDEOS_PER_PAGE).map(video => preloadImage(video.thumbnail)));
+}
+
+function insertVideosAtRandomIndexes(videos: OdyseeVideo[], testVideos: OdyseeVideo[]): OdyseeVideo[] {
+  return testVideos.reduce((items, video) => {
+    const filteredItems = items.filter(item => item.id !== video.id);
+    const randomIndex = Math.floor(Math.random() * (filteredItems.length + 1));
+    return [
+      ...filteredItems.slice(0, randomIndex),
+      video,
+      ...filteredItems.slice(randomIndex),
+    ];
+  }, videos);
+}
+
+function getAutoplayEmbedUrl(embedUrl: string): string {
+  try {
+    const url = new URL(embedUrl);
+    url.searchParams.set('autoplay', '1');
+    if (url.hostname.includes('youtube')) {
+      url.searchParams.set('mute', '1');
+    } else if (url.hostname.includes('dailymotion')) {
+      url.searchParams.set('mute', 'true');
+    } else if (url.hostname.includes('vimeo')) {
+      url.searchParams.set('muted', '1');
+    }
+    return url.toString();
+  } catch {
+    return embedUrl.includes('?') ? `${embedUrl}&autoplay=1` : `${embedUrl}?autoplay=1`;
+  }
+}
+
+export const PlayerGrid: React.FC<PlayerGridProps> = ({
+  isDark = true,
+  revealContent = true,
+  onInitialContentReady,
+  onToggleTheme,
+}) => {
   const [videos, setVideos] = useState<OdyseeVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<OdyseeVideo | null>(null);
-  const [showPlayerFrame, setShowPlayerFrame] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const gridRef = useRef<HTMLDivElement>(null);
@@ -93,17 +192,8 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
       history.pushState({ videoModal: true }, '');
     } else {
       document.body.style.overflow = 'auto';
-      setShowPlayerFrame(false);
     }
     return () => { document.body.style.overflow = 'auto'; };
-  }, [selectedVideo]);
-
-  useEffect(() => {
-    if (!selectedVideo) return;
-    const timer = window.setTimeout(() => {
-      setShowPlayerFrame(true);
-    }, 260);
-    return () => window.clearTimeout(timer);
   }, [selectedVideo]);
 
   useEffect(() => {
@@ -121,9 +211,14 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
       setLoading(true);
       try {
         const data = await fetchOdyseeVideos('@Alis_FX:f');
-        if (isMounted) setVideos(data);
+        const dataWithTestVideos = insertVideosAtRandomIndexes(data, TEST_EMBED_VIDEOS);
+        await preloadInitialThumbnails(dataWithTestVideos);
+        if (isMounted) setVideos(dataWithTestVideos);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          onInitialContentReady?.();
+        }
       }
     };
 
@@ -132,7 +227,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [onInitialContentReady]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -157,6 +252,8 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
   };
 
   const mutedText = isDark ? 'text-white/30' : 'text-gray-500';
+  const gridHiddenState = { opacity: 0, y: 14 };
+  const gridVisibleState = { opacity: 1, y: 0 };
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
@@ -198,18 +295,13 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
           <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-4">
-            <Loader2 className="w-12 h-12 text-[#ff0080] animate-spin" />
-            <p className={`${mutedText} font-mono text-xs uppercase tracking-widest`}>Fetching from Odysee...</p>
-          </div>
-        ) : (
+        {!loading && (
           <div ref={gridRef} className="scroll-mt-8">
             <AnimatePresence mode="wait">
               <motion.div
                 key={safePage}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={gridHiddenState}
+                animate={revealContent ? gridVisibleState : gridHiddenState}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
                 className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
@@ -218,9 +310,13 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
                   pageVideos.map((video, idx) => (
                     <motion.div
                       key={video.id}
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.22, ease: 'easeOut', delay: Math.min(idx * 0.02, 0.3) }}
+                      initial={gridHiddenState}
+                      animate={revealContent ? gridVisibleState : gridHiddenState}
+                      transition={{
+                        duration: 0.26,
+                        ease: 'easeOut',
+                        delay: revealContent ? Math.min(idx * 0.025, 0.4) : 0,
+                      }}
                     >
                       <GlassCard
                         title={video.title}
@@ -275,18 +371,16 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({ isDark = true, onToggleT
               style={{ maxHeight: '90dvh' }}
             >
               <div className="modal-video-shell w-full bg-black overflow-hidden">
-                {showPlayerFrame && (
-                  <iframe
-                    key={selectedVideo.id}
-                    src={`${selectedVideo.embed_url}?autoplay=1`}
-                    title={selectedVideo.title}
-                    className="modal-video-frame"
-                    allowFullScreen
-                    allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    loading="eager"
-                  />
-                )}
+                <iframe
+                  key={selectedVideo.id}
+                  src={getAutoplayEmbedUrl(selectedVideo.embed_url)}
+                  title={selectedVideo.title}
+                  className="modal-video-frame"
+                  allowFullScreen
+                  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  loading="eager"
+                />
               </div>
 
               <div className="glass-modal-title w-full px-2 pt-4 pb-1 md:px-3 md:pt-5 md:pb-2 shrink-0">
