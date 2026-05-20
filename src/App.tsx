@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AppPreloader } from './components/AppPreloader';
 import { PlayerGrid } from './components/PlayerGrid';
 
@@ -13,14 +13,41 @@ export default function App() {
     }
   });
   const [isPreloading, setIsPreloading] = useState(true);
+  const [contentReady, setContentReady] = useState(false);
+  const [revealContent, setRevealContent] = useState(false);
+  const handleInitialContentReady = useCallback(() => {
+    setContentReady(true);
+  }, []);
 
   useEffect(() => {
     window.hideWebflowPreloader?.();
-    const timer = setTimeout(() => {
-      setIsPreloading(false);
-    }, 1200);
-    return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!contentReady) return;
+
+    setIsPreloading(false);
+    const timer = window.setTimeout(() => {
+      setRevealContent(true);
+    }, 480);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [contentReady]);
+
+  useEffect(() => {
+    if (!isPreloading) {
+      document.body.classList.remove('preloading');
+      document.body.style.overflow = 'auto';
+    } else {
+      document.body.classList.add('preloading');
+    }
+
+    return () => {
+      document.body.classList.remove('preloading');
+    };
+  }, [isPreloading]);
 
   useEffect(() => {
     if (isDark) {
@@ -64,7 +91,12 @@ export default function App() {
       )}
 
       <div className="relative z-10">
-        <PlayerGrid isDark={isDark} onToggleTheme={() => setIsDark(d => !d)} />
+        <PlayerGrid
+          isDark={isDark}
+          revealContent={revealContent}
+          onInitialContentReady={handleInitialContentReady}
+          onToggleTheme={() => setIsDark(d => !d)}
+        />
       </div>
     </main>
   );

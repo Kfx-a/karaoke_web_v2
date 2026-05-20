@@ -503,6 +503,11 @@ html:not(.dark) .glass-modal-title h2 {
 }
 
 @media (max-width: 767px) {
+  .modal-video-shell {
+    border-radius: 4px;
+    clip-path: inset(0 round 4px);
+  }
+
   .glass-modal {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
