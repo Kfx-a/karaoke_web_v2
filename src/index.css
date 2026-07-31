@@ -274,9 +274,15 @@
   position: absolute;
   inset: 0;
   background: rgba(9, 9, 11, 0.62);
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
   animation: overlay-entry 150ms ease-out both;
+}
+
+.player-page {
+  transition: filter 180ms ease;
+}
+
+.player-page-blurred {
+  filter: blur(6px);
 }
 
 .video-modal {
