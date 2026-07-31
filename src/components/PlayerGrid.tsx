@@ -306,7 +306,8 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
-      <button
+      <div className={selectedVideo ? 'player-page player-page-blurred' : 'player-page'}>
+        <button
         onClick={onToggleTheme}
         className={[
           'fixed top-6 right-4 md:top-10 md:right-6 z-[180]',
@@ -318,9 +319,9 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
         aria-label="Toggle theme"
       >
         {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-      </button>
+        </button>
 
-      <div className="w-full flex items-center gap-3 mb-6 md:mb-8 pr-14 md:pr-16">
+        <div className="w-full flex items-center gap-3 mb-6 md:mb-8 pr-14 md:pr-16">
         <div className="relative group/search flex-1">
           <input
             type="text"
@@ -337,9 +338,9 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
           />
           <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors group-focus-within/search:text-rose-500 ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`} />
         </div>
-      </div>
+        </div>
 
-      <div inert={selectedVideo ? true : undefined} className={selectedVideo ? 'pointer-events-none select-none' : ''}>
+        <div inert={selectedVideo ? true : undefined} className={selectedVideo ? 'pointer-events-none select-none' : ''}>
         <div className="flex items-center justify-center mb-5">
           <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
         </div>
@@ -368,6 +369,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
 
         <div className="flex items-center justify-center mt-10">
           <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
+        </div>
         </div>
       </div>
 
