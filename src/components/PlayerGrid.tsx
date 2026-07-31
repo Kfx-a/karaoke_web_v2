@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useState } from 'react';
 import { GlassCard } from './GlassCard';
 import { ChevronLeft, ChevronRight, Search, Sun, Moon } from 'lucide-react';
 import { fetchOdyseeVideos, sortByPriority, type OdyseeVideo } from '../services/odyseeService';
 
-const VIDEOS_PER_PAGE = 20;
+const VIDEOS_PER_PAGE = 16;
 const THUMBNAIL_PRELOAD_TIMEOUT_MS = 10000;
 const TEST_EMBED_VIDEOS: OdyseeVideo[] = [
   {
@@ -69,11 +68,11 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
   };
 
   const pages = buildPages();
-  const btnBase = 'pagination-glass-button flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold transition-all duration-200 select-none border';
-  const btnActive = 'pagination-glass-active';
-  const btnNormal = isDark ? 'pagination-glass-dark' : 'pagination-glass-light';
-  const btnArrow = isDark ? 'pagination-glass-dark' : 'pagination-glass-light';
-  const ellipsisColor = isDark ? 'text-white/30' : 'text-gray-500';
+  const btnBase = 'pagination-button flex items-center justify-center w-8 h-8 rounded-md text-xs font-bold transition-colors duration-150 select-none';
+  const btnActive = 'pagination-active';
+  const btnNormal = isDark ? 'pagination-dark' : 'pagination-light';
+  const btnArrow = isDark ? 'pagination-dark' : 'pagination-light';
+  const ellipsisColor = isDark ? 'text-zinc-500' : 'text-zinc-400';
 
   return (
     <div className="flex items-center justify-center gap-2">
@@ -184,7 +183,10 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
   const [selectedVideo, setSelectedVideo] = useState<OdyseeVideo | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
-  const gridRef = useRef<HTMLDivElement>(null);
+  const [initialCardsAnimated, setInitialCardsAnimated] = useState(false);
+  const [pageDirection, setPageDirection] = useState<'next' | 'previous'>('next');
+  const [pageTransitionPhase, setPageTransitionPhase] = useState<'idle' | 'sliding'>('idle');
+  const [outgoingPageVideos, setOutgoingPageVideos] = useState<OdyseeVideo[] | null>(null);
 
   useEffect(() => {
     if (selectedVideo) {
@@ -231,6 +233,8 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
+    setOutgoingPageVideos(null);
+    setPageTransitionPhase('idle');
   }, [searchQuery]);
 
   const filteredVideos = sortByPriority(
@@ -242,8 +246,11 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
   const pageVideos = filteredVideos.slice((safePage - 1) * VIDEOS_PER_PAGE, safePage * VIDEOS_PER_PAGE);
 
   const handlePageChange = (page: number) => {
+    if (page === safePage || pageTransitionPhase !== 'idle') return;
+    setPageDirection(page > safePage ? 'next' : 'previous');
+    setOutgoingPageVideos(pageVideos);
+    setPageTransitionPhase('sliding');
     setCurrentPage(page);
-    gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const closeModal = () => {
@@ -252,19 +259,61 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
   };
 
   const mutedText = isDark ? 'text-white/30' : 'text-gray-500';
-  const gridHiddenState = { opacity: 0, y: 14 };
-  const gridVisibleState = { opacity: 1, y: 0 };
+  const shouldAnimateInitialCards = revealContent && !initialCardsAnimated;
+  const cardEntryClass = shouldAnimateInitialCards
+    ? 'grid-entry grid-entry-visible'
+    : initialCardsAnimated
+      ? undefined
+      : 'grid-initial-hidden';
+
+  const renderCards = (items: OdyseeVideo[], animateInitialEntry = false) => {
+    if (items.length === 0) {
+      return (
+        <div className="col-span-full py-20 text-center">
+          <p className={`${mutedText} font-mono text-xs uppercase tracking-widest`}>No videos found.</p>
+        </div>
+      );
+    }
+
+    return items.map((video, idx) => (
+      <div
+        key={video.id}
+        className={animateInitialEntry ? cardEntryClass : undefined}
+        style={animateInitialEntry && shouldAnimateInitialCards ? { animationDelay: `${Math.min(idx * 25, 400)}ms` } : undefined}
+        onAnimationEnd={animateInitialEntry && idx === items.length - 1 ? () => setInitialCardsAnimated(true) : undefined}
+      >
+        <GlassCard
+          title={video.title}
+          thumbnail={video.thumbnail}
+          duration={video.duration}
+          viewCount={video.view_count}
+          onClick={() => setSelectedVideo(video)}
+          priority={idx < 8}
+        />
+      </div>
+    ));
+  };
+
+  const handleOutgoingPageAnimationEnd = (event: React.AnimationEvent<HTMLDivElement>) => {
+    if (event.currentTarget !== event.target) return;
+    setOutgoingPageVideos(null);
+  };
+
+  const handleIncomingPageAnimationEnd = (event: React.AnimationEvent<HTMLDivElement>) => {
+    if (event.currentTarget !== event.target) return;
+    setPageTransitionPhase('idle');
+  };
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
       <button
         onClick={onToggleTheme}
         className={[
-          'fixed top-4 right-4 md:top-6 md:right-6 z-[180]',
-          'w-[46px] h-[46px] flex items-center justify-center rounded-2xl border transition-all shrink-0 backdrop-blur-md',
+          'fixed top-6 right-4 md:top-10 md:right-6 z-[180]',
+          'w-11 h-11 flex items-center justify-center rounded-lg border transition-colors shrink-0',
           isDark
-            ? 'bg-white/5 border-white/10 hover:border-white/20 text-white/75 hover:text-white'
-            : 'bg-white/75 border-black/10 hover:border-black/20 text-gray-700 hover:text-gray-950 shadow-sm',
+            ? 'bg-zinc-900 border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white'
+            : 'bg-white border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-950',
         ].join(' ')}
         aria-label="Toggle theme"
       >
@@ -279,14 +328,14 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={[
-              'w-full h-[46px] pl-5 pr-12 rounded-2xl text-sm outline-none transition-all backdrop-blur-md',
-              'border focus:border-[#ff0080]/50 focus:shadow-[0_0_15px_rgba(255,0,128,0.15)]',
+              'w-full h-11 pl-4 pr-12 rounded-lg text-sm outline-none transition-colors border',
+              'focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20',
               isDark
-                ? 'bg-white/5 border-white/10 text-white placeholder-white/30'
-                : 'bg-white/75 border-black/10 text-gray-950 placeholder-gray-500 shadow-sm',
+                ? 'bg-zinc-900 border-zinc-700 text-white placeholder-zinc-500'
+                : 'bg-white border-zinc-300 text-zinc-950 placeholder-zinc-500',
             ].join(' ')}
           />
-          <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors group-focus-within/search:text-[#ff0080] ${isDark ? 'text-white/45' : 'text-gray-500'}`} />
+          <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors group-focus-within/search:text-rose-500 ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`} />
         </div>
       </div>
 
@@ -296,45 +345,24 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
         </div>
 
         {!loading && (
-          <div ref={gridRef} className="scroll-mt-8">
-            <AnimatePresence mode="wait">
-              <motion.div
+          <div className="scroll-mt-8">
+            <div className="grid-page-viewport">
+              {outgoingPageVideos && (
+                <div
+                  className={`grid-page grid-page-outgoing grid-page-outgoing-${pageDirection} grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
+                  onAnimationEnd={handleOutgoingPageAnimationEnd}
+                >
+                  {renderCards(outgoingPageVideos)}
+                </div>
+              )}
+              <div
                 key={safePage}
-                initial={gridHiddenState}
-                animate={revealContent ? gridVisibleState : gridHiddenState}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
+                className={`grid-page ${pageTransitionPhase === 'sliding' ? `grid-page-incoming grid-page-incoming-${pageDirection}` : ''} grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
+                onAnimationEnd={pageTransitionPhase === 'sliding' ? handleIncomingPageAnimationEnd : undefined}
               >
-                {pageVideos.length > 0 ? (
-                  pageVideos.map((video, idx) => (
-                    <motion.div
-                      key={video.id}
-                      initial={gridHiddenState}
-                      animate={revealContent ? gridVisibleState : gridHiddenState}
-                      transition={{
-                        duration: 0.26,
-                        ease: 'easeOut',
-                        delay: revealContent ? Math.min(idx * 0.025, 0.4) : 0,
-                      }}
-                    >
-                      <GlassCard
-                        title={video.title}
-                        thumbnail={video.thumbnail}
-                        duration={video.duration}
-                        viewCount={video.view_count}
-                        onClick={() => setSelectedVideo(video)}
-                        priority={idx < 8}
-                      />
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="col-span-full py-20 text-center">
-                    <p className={`${mutedText} font-mono text-xs uppercase tracking-widest`}>No videos found.</p>
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
+                {renderCards(pageVideos, true)}
+              </div>
+            </div>
           </div>
         )}
 
@@ -343,33 +371,11 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedVideo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 md:p-8"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={closeModal}
-              className={`absolute inset-0 backdrop-blur-md ${isDark ? 'bg-black/70' : 'bg-white/45'}`}
-            />
+      {selectedVideo && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-6 md:p-8">
+          <div onClick={closeModal} className="video-modal-backdrop" />
 
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 24 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.94, opacity: 0, y: 18 }}
-              transition={{ duration: 0.24, ease: 'easeOut' }}
-              className="glass-modal relative w-full max-w-[98vw] sm:max-w-[90vw] md:max-w-[75vw] lg:max-w-[65vw] rounded-2xl overflow-hidden flex flex-col"
-              style={{ maxHeight: '90dvh' }}
-            >
+          <div className="video-modal max-w-[98vw] sm:max-w-[90vw] md:max-w-[75vw] lg:max-w-[65vw]">
               <div className="modal-video-shell w-full bg-black overflow-hidden">
                 <iframe
                   key={selectedVideo.id}
@@ -383,15 +389,14 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
                 />
               </div>
 
-              <div className="glass-modal-title w-full px-2 pt-4 pb-1 md:px-3 md:pt-5 md:pb-2 shrink-0">
+              <div className="video-modal-title w-full px-3 py-3 md:px-4 md:py-4 shrink-0">
                 <h2 className="text-sm md:text-base font-semibold text-white line-clamp-2">
                   {selectedVideo.title}
                 </h2>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
 
     </div>
   );

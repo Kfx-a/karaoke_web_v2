@@ -29,7 +29,7 @@ export default function App() {
     setIsPreloading(false);
     const timer = window.setTimeout(() => {
       setRevealContent(true);
-    }, 480);
+    }, 220);
 
     return () => {
       window.clearTimeout(timer);
@@ -67,28 +67,14 @@ export default function App() {
     <main
       className={[
         'min-h-screen relative',
-        'selection:bg-[#d946ef]/30',
-        'transition-colors duration-500',
+        'selection:bg-rose-500/30',
+        'transition-colors duration-150',
         isDark
-          ? 'bg-[#0f0720] text-white'
-          : 'bg-[#f0ebff] text-gray-900',
+          ? 'bg-zinc-950 text-zinc-50'
+          : 'bg-zinc-100 text-zinc-950',
       ].join(' ')}
     >
       <AppPreloader visible={isPreloading} />
-
-      {/* Ambient gradient adapts per theme. */}
-      {isDark ? (
-        <>
-          <div className="fixed top-0 inset-x-0 h-[600px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#d946ef]/20 via-[#a855f7]/10 to-transparent pointer-events-none z-0" />
-          <div className="fixed top-0 -left-1/4 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#f0abfc]/10 via-transparent to-transparent blur-3xl pointer-events-none z-0" />
-          <div className="fixed top-40 -right-1/4 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#67e8f9]/6 via-transparent to-transparent blur-3xl pointer-events-none z-0" />
-        </>
-      ) : (
-        <>
-          <div className="fixed top-0 inset-x-0 h-[600px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#d946ef]/15 via-[#a855f7]/8 to-transparent pointer-events-none z-0" />
-          <div className="fixed top-0 -left-1/4 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#f0abfc]/25 via-transparent to-transparent blur-3xl pointer-events-none z-0" />
-        </>
-      )}
 
       <div className="relative z-10">
         <PlayerGrid
