@@ -70,8 +70,8 @@ export default function App() {
         'selection:bg-rose-500/30',
         'transition-colors duration-150',
         isDark
-          ? 'bg-zinc-950 text-zinc-50'
-          : 'bg-zinc-100 text-zinc-950',
+          ? 'bg-app-dark text-zinc-50'
+          : 'bg-app-light text-zinc-950',
       ].join(' ')}
     >
       <AppPreloader visible={isPreloading} />
