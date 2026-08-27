@@ -60,12 +60,16 @@ interface ViewCountsResponse {
   counts?: Record<string, number | null>;
 }
 
-const CACHE_KEY = 'odysee_videos_cache_v3';
+const CACHE_KEY = 'odysee_videos_cache_v4';
 const AUTH_TOKEN_KEY = 'odysee_anonymous_auth_token';
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const API_TIMEOUT_MS = 15000;
+const VIEW_COUNT_CONCURRENCY = 6;
+const MAX_VIEW_COUNT_IDS = 50;
 const PROXY_URL = 'https://api.na-backend.odysee.com/api/v1/proxy';
 const ODYSEE_API_URL = 'https://api.odysee.com';
 const ODYSEE_APP_ID = 'odyseecom692EAWhtoqDuAfQ6KHMXxFxt8tkhmt7sfprEMHWKjy5hf6PwZcHDV542V';
+const ODYSEE_THUMBNAIL_CDN = 'https://thumbnails.odycdn.com/optimize/s:640:360/quality:80/plain/';
 
 let authTokenPromise: Promise<string> | null = null;
 
@@ -102,8 +106,22 @@ function setCache(channel: string, data: OdyseeVideo[]) {
   }
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function postOdysee<T>(method: string, params: unknown): Promise<OdyseeRpcResponse<T>> {
-  const response = await fetch(PROXY_URL, {
+  const url = new URL(PROXY_URL);
+  url.searchParams.set('m', method);
+
+  const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -149,7 +167,7 @@ async function createAnonymousAuthToken(): Promise<string> {
     app_id: ODYSEE_APP_ID,
   });
 
-  const response = await fetch(`${ODYSEE_API_URL}/user/new`, {
+  const response = await fetchWithTimeout(`${ODYSEE_API_URL}/user/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -186,7 +204,7 @@ async function fetchViewCount(claimId: string, authToken: string): Promise<numbe
     url.searchParams.set('auth_token', authToken);
     url.searchParams.set('claim_id', claimId);
 
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) return null;
 
     const data = await response.json() as OdyseeApiResponse<number[]>;
@@ -203,7 +221,7 @@ async function fetchViewCountsFromServer(claimIds: string[]): Promise<Record<str
     const url = new URL('/api/odysee-view-counts', window.location.origin);
     url.searchParams.set('claim_ids', claimIds.join(','));
 
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url);
     if (!response.ok) return null;
 
     const data = await response.json() as ViewCountsResponse;
@@ -224,18 +242,25 @@ function getCanonicalPath(claim: OdyseeClaim): string {
   return source.replace('lbry://', '').replace(/#/g, ':');
 }
 
+function getThumbnailUrl(rawThumbnail: string, claimId: string): string {
+  if (!rawThumbnail) return `https://picsum.photos/seed/${claimId}/800/450`;
+  if (rawThumbnail.startsWith('https://thumbnails.odycdn.com/')) return rawThumbnail;
+  if (/^https?:\/\//i.test(rawThumbnail)) return `${ODYSEE_THUMBNAIL_CDN}${rawThumbnail}`;
+  return `https://picsum.photos/seed/${claimId}/800/450`;
+}
+
 function mapClaimToVideo(claim: OdyseeClaim, index: number): OdyseeVideo {
   const metadata = claim.value || {};
   const durationSeconds = metadata.video?.duration || metadata.audio?.duration || 0;
   const claimId = claim.claim_id || claim.name || `unknown-video-${index}`;
-  const rawThumbnail = metadata.thumbnail?.url || `https://picsum.photos/seed/${claimId}/800/1000`;
+  const rawThumbnail = metadata.thumbnail?.url || '';
   const canonicalPath = getCanonicalPath(claim);
 
   return {
     id: claimId,
     name: claim.name || claimId,
     title: metadata.title || 'Untitled',
-    thumbnail: `https://wsrv.nl/?url=${encodeURIComponent(rawThumbnail)}&w=640&output=webp&q=80&we`,
+    thumbnail: getThumbnailUrl(rawThumbnail, claimId),
     duration: formatDuration(durationSeconds),
     view_count: null,
     release_time: String(claim.meta?.release_time || claim.timestamp || ''),
@@ -245,25 +270,41 @@ function mapClaimToVideo(claim: OdyseeClaim, index: number): OdyseeVideo {
   };
 }
 
-async function attachViewCounts(videos: OdyseeVideo[]): Promise<OdyseeVideo[]> {
-  try {
-    const serverCounts = await fetchViewCountsFromServer(videos.map(video => video.id));
-    if (serverCounts) {
-      return videos.map(video => ({
-        ...video,
-        view_count: typeof serverCounts[video.id] === 'number' ? serverCounts[video.id] : null,
-      }));
+function isClaimId(value: string): boolean {
+  return /^[a-f0-9]{40}$/i.test(value);
+}
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await mapper(items[index]);
     }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+export async function fetchOdyseeViewCounts(videos: OdyseeVideo[]): Promise<Record<string, number | null>> {
+  const claimIds = [...new Set(videos.map(video => video.id).filter(isClaimId))].slice(0, MAX_VIEW_COUNT_IDS);
+  if (claimIds.length === 0) return {};
+
+  try {
+    const serverCounts = await fetchViewCountsFromServer(claimIds);
+    if (serverCounts) return serverCounts;
 
     const authToken = await getOdyseeAuthToken();
-    return Promise.all(
-      videos.map(async (video) => ({
-        ...video,
-        view_count: await fetchViewCount(video.id, authToken),
-      }))
-    );
+    const counts = await mapWithConcurrency(claimIds, VIEW_COUNT_CONCURRENCY, async claimId => [
+      claimId,
+      await fetchViewCount(claimId, authToken),
+    ] as const);
+    return Object.fromEntries(counts);
   } catch {
-    return videos;
+    return {};
   }
 }
 
@@ -288,14 +329,14 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
       page_size: 200,
       no_totals: true,
       claim_type: ['stream'],
+      stream_types: ['video'],
       has_source: true,
     });
 
     const videos = (searchData.result?.items || []).map(mapClaimToVideo);
-    const videosWithViews = await attachViewCounts(videos);
 
-    setCache(channelName, videosWithViews);
-    return videosWithViews;
+    setCache(channelName, videos);
+    return videos;
   } catch (error) {
     console.error('Error fetching Odysee videos:', error);
     return [];

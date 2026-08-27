@@ -292,6 +292,10 @@
   filter: blur(6px);
 }
 
+.theme-toggle-blurred {
+  filter: blur(6px);
+}
+
 .video-modal {
   position: relative;
   display: flex;
