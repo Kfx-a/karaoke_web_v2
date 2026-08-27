@@ -60,6 +60,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
             src={thumbnail}
             alt={title}
             loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
             decoding="async"
             className="absolute inset-0 w-full h-full object-cover"
             referrerPolicy="no-referrer"

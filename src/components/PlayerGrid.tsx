@@ -1,48 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { GlassCard } from './GlassCard';
 import { ChevronLeft, ChevronRight, Search, Sun, Moon } from 'lucide-react';
-import { fetchOdyseeVideos, sortByPriority, type OdyseeVideo } from '../services/odyseeService';
+import { fetchOdyseeVideos, fetchOdyseeViewCounts, sortByPriority, type OdyseeVideo } from '../services/odyseeService';
 
-const VIDEOS_PER_PAGE = 16;
+const DESKTOP_VIDEOS_PER_PAGE = 16;
+const TABLET_VIDEOS_PER_PAGE = 12;
+const MOBILE_VIDEOS_PER_PAGE = 5;
 const THUMBNAIL_PRELOAD_TIMEOUT_MS = 10000;
-const TEST_EMBED_VIDEOS: OdyseeVideo[] = [
-  {
-    id: 'youtube-test-NvccnhoXPQ4',
-    name: 'youtube-test-NvccnhoXPQ4',
-    title: 'YouTube test',
-    thumbnail: 'https://img.youtube.com/vi/NvccnhoXPQ4/hqdefault.jpg',
-    duration: 'YT',
-    view_count: null,
-    release_time: '',
-    canonical_url: 'https://www.youtube-nocookie.com/embed/NvccnhoXPQ4?si=6y6cYboviDiLGzva',
-    embed_url: 'https://www.youtube-nocookie.com/embed/NvccnhoXPQ4?si=6y6cYboviDiLGzva',
-    description: '[test]',
-  },
-  {
-    id: 'dailymotion-test-x2zw06g',
-    name: 'dailymotion-test-x2zw06g',
-    title: 'Dailymotion test',
-    thumbnail: 'https://www.dailymotion.com/thumbnail/video/x2zw06g',
-    duration: 'DM',
-    view_count: null,
-    release_time: '',
-    canonical_url: 'https://geo.dailymotion.com/player.html?video=x2zw06g',
-    embed_url: 'https://geo.dailymotion.com/player.html?video=x2zw06g',
-    description: '[test]',
-  },
-  {
-    id: 'vimeo-test-133230974',
-    name: 'vimeo-test-133230974',
-    title: 'Etotama Opening Karaoke AFX',
-    thumbnail: 'https://vumbnail.com/133230974.jpg',
-    duration: 'VM',
-    view_count: null,
-    release_time: '',
-    canonical_url: 'https://player.vimeo.com/video/133230974?badge=0&autopause=0&player_id=0&app_id=58479',
-    embed_url: 'https://player.vimeo.com/video/133230974?badge=0&autopause=0&player_id=0&app_id=58479',
-    description: '[test]',
-  },
-];
 
 interface PaginationProps {
   currentPage: number;
@@ -139,33 +103,21 @@ function preloadImage(src: string): Promise<void> {
   });
 }
 
-async function preloadInitialThumbnails(videos: OdyseeVideo[]) {
-  await Promise.all(videos.slice(0, VIDEOS_PER_PAGE).map(video => preloadImage(video.thumbnail)));
+function getVideosPerPage(): number {
+  if (typeof window === 'undefined') return DESKTOP_VIDEOS_PER_PAGE;
+  if (window.innerWidth < 768) return MOBILE_VIDEOS_PER_PAGE;
+  if (window.innerWidth < 1024) return TABLET_VIDEOS_PER_PAGE;
+  return DESKTOP_VIDEOS_PER_PAGE;
 }
 
-function insertVideosAtRandomIndexes(videos: OdyseeVideo[], testVideos: OdyseeVideo[]): OdyseeVideo[] {
-  return testVideos.reduce((items, video) => {
-    const filteredItems = items.filter(item => item.id !== video.id);
-    const randomIndex = Math.floor(Math.random() * (filteredItems.length + 1));
-    return [
-      ...filteredItems.slice(0, randomIndex),
-      video,
-      ...filteredItems.slice(randomIndex),
-    ];
-  }, videos);
+async function preloadInitialThumbnails(videos: OdyseeVideo[]) {
+  await Promise.all(videos.slice(0, getVideosPerPage()).map(video => preloadImage(video.thumbnail)));
 }
 
 function getAutoplayEmbedUrl(embedUrl: string): string {
   try {
     const url = new URL(embedUrl);
     url.searchParams.set('autoplay', '1');
-    if (url.hostname.includes('youtube')) {
-      url.searchParams.set('mute', '1');
-    } else if (url.hostname.includes('dailymotion')) {
-      url.searchParams.set('mute', 'true');
-    } else if (url.hostname.includes('vimeo')) {
-      url.searchParams.set('muted', '1');
-    }
     return url.toString();
   } catch {
     return embedUrl.includes('?') ? `${embedUrl}&autoplay=1` : `${embedUrl}?autoplay=1`;
@@ -187,6 +139,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
   const [pageDirection, setPageDirection] = useState<'next' | 'previous'>('next');
   const [pageTransitionPhase, setPageTransitionPhase] = useState<'idle' | 'sliding'>('idle');
   const [outgoingPageVideos, setOutgoingPageVideos] = useState<OdyseeVideo[] | null>(null);
+  const [videosPerPage, setVideosPerPage] = useState(getVideosPerPage);
 
   useEffect(() => {
     if (selectedVideo) {
@@ -213,9 +166,8 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
       setLoading(true);
       try {
         const data = await fetchOdyseeVideos('@Alis_FX:f');
-        const dataWithTestVideos = insertVideosAtRandomIndexes(data, TEST_EMBED_VIDEOS);
-        await preloadInitialThumbnails(dataWithTestVideos);
-        if (isMounted) setVideos(dataWithTestVideos);
+        await preloadInitialThumbnails(data);
+        if (isMounted) setVideos(data);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -235,15 +187,44 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
     setCurrentPage(1);
     setOutgoingPageVideos(null);
     setPageTransitionPhase('idle');
-  }, [searchQuery]);
+  }, [searchQuery, videosPerPage]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setVideosPerPage(getVideosPerPage());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const filteredVideos = sortByPriority(
     videos.filter(v => v.title.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredVideos.length / VIDEOS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filteredVideos.length / videosPerPage));
   const safePage = Math.min(currentPage, totalPages);
-  const pageVideos = filteredVideos.slice((safePage - 1) * VIDEOS_PER_PAGE, safePage * VIDEOS_PER_PAGE);
+  const pageVideos = filteredVideos.slice((safePage - 1) * videosPerPage, safePage * videosPerPage);
+  const visibleVideoIds = pageVideos.map(video => video.id).join(',');
+
+  useEffect(() => {
+    if (loading || pageVideos.length === 0) return;
+
+    let cancelled = false;
+    fetchOdyseeViewCounts(pageVideos).then(viewCounts => {
+      if (cancelled || Object.keys(viewCounts).length === 0) return;
+
+      setVideos(currentVideos => currentVideos.map(video => (
+        viewCounts[video.id] === undefined
+          ? video
+          : { ...video, view_count: viewCounts[video.id] }
+      )));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, safePage, visibleVideoIds]);
 
   const handlePageChange = (page: number) => {
     if (page === safePage || pageTransitionPhase !== 'idle') return;
@@ -306,12 +287,12 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
-      <div className={selectedVideo ? 'player-page player-page-blurred' : 'player-page'}>
-        <button
+      <button
         onClick={onToggleTheme}
         className={[
           'fixed top-6 right-4 md:top-10 md:right-6 z-[180]',
           'w-11 h-11 flex items-center justify-center rounded-lg border transition-colors shrink-0',
+          selectedVideo ? 'theme-toggle-blurred' : '',
           isDark
             ? 'bg-zinc-900 border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white'
             : 'bg-white border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-950',
@@ -319,10 +300,12 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
         aria-label="Toggle theme"
       >
         {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-        </button>
+      </button>
+
+      <div className={selectedVideo ? 'player-page player-page-blurred' : 'player-page'}>
 
         <div className="w-full flex items-center gap-3 mb-6 md:mb-8 pr-14 md:pr-16">
-        <div className="relative group/search flex-1">
+          <div className="relative group/search flex-1">
           <input
             type="text"
             placeholder="Buscar videos..."
@@ -337,20 +320,20 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
             ].join(' ')}
           />
           <Search className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors group-focus-within/search:text-rose-500 ${isDark ? 'text-zinc-500' : 'text-zinc-500'}`} />
-        </div>
+          </div>
         </div>
 
         <div inert={selectedVideo ? true : undefined} className={selectedVideo ? 'pointer-events-none select-none' : ''}>
-        <div className="flex items-center justify-center mb-5">
-          <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
-        </div>
+          <div className="flex items-center justify-center mb-5">
+            <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
+          </div>
 
         {!loading && (
           <div className="scroll-mt-8">
             <div className="grid-page-viewport">
               {outgoingPageVideos && (
                 <div
-                  className={`grid-page grid-page-outgoing grid-page-outgoing-${pageDirection} grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
+                  className={`grid-page grid-page-outgoing grid-page-outgoing-${pageDirection} grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
                   onAnimationEnd={handleOutgoingPageAnimationEnd}
                 >
                   {renderCards(outgoingPageVideos)}
@@ -358,7 +341,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
               )}
               <div
                 key={safePage}
-                className={`grid-page ${pageTransitionPhase === 'sliding' ? `grid-page-incoming grid-page-incoming-${pageDirection}` : ''} grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
+                className={`grid-page ${pageTransitionPhase === 'sliding' ? `grid-page-incoming grid-page-incoming-${pageDirection}` : ''} grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
                 onAnimationEnd={pageTransitionPhase === 'sliding' ? handleIncomingPageAnimationEnd : undefined}
               >
                 {renderCards(pageVideos, true)}
@@ -367,9 +350,9 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-center mt-10">
-          <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
-        </div>
+          <div className="flex items-center justify-center mt-10">
+            <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
+          </div>
         </div>
       </div>
 
