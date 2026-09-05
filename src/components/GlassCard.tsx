@@ -46,9 +46,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
       tabIndex={0}
       aria-label={`Reproducir ${title}`}
       className={cn(
-        'group cursor-pointer relative rounded-lg h-full',
+        'video-card-shell group cursor-pointer relative rounded-lg h-full',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950',
-        'active:scale-[0.99]',
         className
       )}
       onClick={onClick}

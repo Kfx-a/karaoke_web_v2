@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppPreloader } from './components/AppPreloader';
+import { AuraBackground } from './components/AuraBackground';
 import { PlayerGrid } from './components/PlayerGrid';
 
 export default function App() {
@@ -66,7 +67,7 @@ export default function App() {
   return (
     <main
       className={[
-        'min-h-screen relative',
+        'app-shell min-h-screen relative',
         'selection:bg-rose-500/30',
         'transition-colors duration-150',
         isDark
@@ -74,6 +75,7 @@ export default function App() {
           : 'bg-app-light text-zinc-950',
       ].join(' ')}
     >
+      <AuraBackground />
       <AppPreloader visible={isPreloading} />
 
       <div className="relative z-10">

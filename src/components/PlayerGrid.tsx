@@ -198,6 +198,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+
   const filteredVideos = sortByPriority(
     videos.filter(v => v.title.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -330,7 +331,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
 
         {!loading && (
           <div className="scroll-mt-8">
-            <div className="grid-page-viewport">
+            <div className={`grid-page-viewport ${pageTransitionPhase === 'sliding' ? 'grid-page-viewport-clipped' : ''}`}>
               {outgoingPageVideos && (
                 <div
                   className={`grid-page grid-page-outgoing grid-page-outgoing-${pageDirection} grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6`}
