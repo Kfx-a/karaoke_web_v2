@@ -16,38 +16,8 @@ interface CacheEntry {
   timestamp: number;
 }
 
-interface OdyseeResolveValue {
-  claim_id?: string;
-}
-
-interface OdyseeClaim {
-  claim_id?: string;
-  name?: string;
-  canonical_url?: string;
-  permanent_url?: string;
-  short_url?: string;
-  timestamp?: number | string;
-  meta?: {
-    release_time?: number | string;
-  };
-  value?: {
-    title?: string;
-    description?: string;
-    thumbnail?: {
-      url?: string;
-    };
-    video?: {
-      duration?: number;
-    };
-    audio?: {
-      duration?: number;
-    };
-  };
-}
-
-interface OdyseeRpcResponse<T> {
-  result?: T;
-  error?: unknown;
+interface ViewCountsResponse {
+  counts?: Record<string, number | null>;
 }
 
 interface OdyseeApiResponse<T> {
@@ -56,20 +26,14 @@ interface OdyseeApiResponse<T> {
   data: T;
 }
 
-interface ViewCountsResponse {
-  counts?: Record<string, number | null>;
-}
-
-const CACHE_KEY = 'odysee_videos_cache_v4';
+const CACHE_KEY = 'odysee_videos_cache_v5';
 const AUTH_TOKEN_KEY = 'odysee_anonymous_auth_token';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const API_TIMEOUT_MS = 15000;
 const VIEW_COUNT_CONCURRENCY = 6;
 const MAX_VIEW_COUNT_IDS = 50;
-const PROXY_URL = 'https://api.na-backend.odysee.com/api/v1/proxy';
 const ODYSEE_API_URL = 'https://api.odysee.com';
 const ODYSEE_APP_ID = 'odyseecom692EAWhtoqDuAfQ6KHMXxFxt8tkhmt7sfprEMHWKjy5hf6PwZcHDV542V';
-const ODYSEE_THUMBNAIL_CDN = 'https://thumbnails.odycdn.com/optimize/s:640:360/quality:80/plain/';
 
 let authTokenPromise: Promise<string> | null = null;
 
@@ -91,6 +55,7 @@ function getCached(channel: string): OdyseeVideo[] | null {
 
     const entry = JSON.parse(raw) as CacheEntry;
     if (Date.now() - entry.timestamp > CACHE_TTL_MS) return null;
+    if (!Array.isArray(entry.data) || entry.data.length === 0) return null;
     return entry.data;
   } catch {
     return null;
@@ -98,6 +63,8 @@ function getCached(channel: string): OdyseeVideo[] | null {
 }
 
 function setCache(channel: string, data: OdyseeVideo[]) {
+  if (data.length === 0) return;
+
   try {
     const entry: CacheEntry = { data, timestamp: Date.now() };
     sessionStorage.setItem(`${CACHE_KEY}_${channel}`, JSON.stringify(entry));
@@ -115,33 +82,6 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   } finally {
     window.clearTimeout(timer);
   }
-}
-
-async function postOdysee<T>(method: string, params: unknown): Promise<OdyseeRpcResponse<T>> {
-  const url = new URL(PROXY_URL);
-  url.searchParams.set('m', method);
-
-  const response = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method,
-      params,
-      id: Date.now(),
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Odysee ${method} failed with HTTP ${response.status}`);
-  }
-
-  const data = await response.json() as OdyseeRpcResponse<T>;
-  if (data.error) {
-    throw new Error(`Odysee ${method} returned an RPC error`);
-  }
-
-  return data;
 }
 
 function getStoredAuthToken(): string | null {
@@ -231,45 +171,6 @@ async function fetchViewCountsFromServer(claimIds: string[]): Promise<Record<str
   }
 }
 
-function formatDuration(durationSeconds = 0): string {
-  const minutes = Math.floor(durationSeconds / 60);
-  const seconds = Math.floor(durationSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function getCanonicalPath(claim: OdyseeClaim): string {
-  const source = claim.canonical_url || claim.permanent_url || claim.short_url || `lbry://${claim.name || 'video'}#${claim.claim_id || ''}`;
-  return source.replace('lbry://', '').replace(/#/g, ':');
-}
-
-function getThumbnailUrl(rawThumbnail: string, claimId: string): string {
-  if (!rawThumbnail) return `https://picsum.photos/seed/${claimId}/800/450`;
-  if (rawThumbnail.startsWith('https://thumbnails.odycdn.com/')) return rawThumbnail;
-  if (/^https?:\/\//i.test(rawThumbnail)) return `${ODYSEE_THUMBNAIL_CDN}${rawThumbnail}`;
-  return `https://picsum.photos/seed/${claimId}/800/450`;
-}
-
-function mapClaimToVideo(claim: OdyseeClaim, index: number): OdyseeVideo {
-  const metadata = claim.value || {};
-  const durationSeconds = metadata.video?.duration || metadata.audio?.duration || 0;
-  const claimId = claim.claim_id || claim.name || `unknown-video-${index}`;
-  const rawThumbnail = metadata.thumbnail?.url || '';
-  const canonicalPath = getCanonicalPath(claim);
-
-  return {
-    id: claimId,
-    name: claim.name || claimId,
-    title: metadata.title || 'Untitled',
-    thumbnail: getThumbnailUrl(rawThumbnail, claimId),
-    duration: formatDuration(durationSeconds),
-    view_count: null,
-    release_time: String(claim.meta?.release_time || claim.timestamp || ''),
-    canonical_url: `https://odysee.com/${canonicalPath}`,
-    embed_url: `https://odysee.com/$/embed/${canonicalPath}`,
-    description: metadata.description || '',
-  };
-}
-
 function isClaimId(value: string): boolean {
   return /^[a-f0-9]{40}$/i.test(value);
 }
@@ -313,27 +214,15 @@ export async function fetchOdyseeVideos(channelName: string): Promise<OdyseeVide
   if (cached) return cached;
 
   try {
-    const resolveData = await postOdysee<Record<string, OdyseeResolveValue>>('resolve', {
-      urls: [`lbry://${channelName}`],
-    });
-    const channelId = resolveData.result?.[`lbry://${channelName}`]?.claim_id;
-
-    if (!channelId) {
-      console.error('Could not resolve Odysee channel ID');
-      return [];
+    const url = new URL('/api/odysee-videos', window.location.origin);
+    url.searchParams.set('channel', channelName);
+    const response = await fetchWithTimeout(url);
+    if (!response.ok) {
+      throw new Error(`Odysee videos endpoint failed with HTTP ${response.status}`);
     }
 
-    const searchData = await postOdysee<{ items?: OdyseeClaim[] }>('claim_search', {
-      channel_ids: [channelId],
-      order_by: ['release_time'],
-      page_size: 200,
-      no_totals: true,
-      claim_type: ['stream'],
-      stream_types: ['video'],
-      has_source: true,
-    });
-
-    const videos = (searchData.result?.items || []).map(mapClaimToVideo);
+    const data = await response.json() as { videos?: OdyseeVideo[] };
+    const videos = Array.isArray(data.videos) ? data.videos : [];
 
     setCache(channelName, videos);
     return videos;
