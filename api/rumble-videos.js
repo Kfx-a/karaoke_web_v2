@@ -1,3 +1,5 @@
+import catalog from '../data/rumble-catalog.json' with { type: 'json' };
+
 const CHANNEL = 'AnimeDarkAmv';
 const CHANNEL_URL = `https://rumble.com/user/${CHANNEL}/videos`;
 const MAX_RESULTS = 200;
@@ -53,7 +55,7 @@ export function parseChannelPage(html) {
   return { videos, nextPage };
 }
 
-async function loadChannel() {
+export async function loadChannel() {
   const videos = new Map();
   const visited = new Set();
   const signal = AbortSignal.timeout(25000);
@@ -67,8 +69,19 @@ async function loadChannel() {
     for (const video of page.videos) videos.set(video.id, video);
     url = page.nextPage;
   }
-  const result = [...videos.values()].slice(0, MAX_RESULTS);
-  if (result.length > 0) cached = { videos: result, timestamp: Date.now() };
+  return [...videos.values()].slice(0, MAX_RESULTS);
+}
+
+async function loadAvailableCatalog() {
+  let result;
+  try {
+    result = { videos: await loadChannel(), source: 'live', updated_at: new Date().toISOString() };
+  } catch (error) {
+    if (catalog.channel !== CHANNEL || !catalog.videos?.length) throw error;
+    console.warn('Rumble unavailable; serving saved channel catalog:', error);
+    result = { videos: catalog.videos, source: 'snapshot', updated_at: catalog.updated_at };
+  }
+  if (result.videos.length > 0) cached = { result, timestamp: Date.now() };
   return result;
 }
 
@@ -79,15 +92,15 @@ export default async function handler(request, response) {
     return;
   }
   try {
-    let videos;
+    let result;
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      videos = cached.videos;
+      result = cached.result;
     } else {
-      pending ??= loadChannel().finally(() => { pending = null; });
-      videos = await pending;
+      pending ??= loadAvailableCatalog().finally(() => { pending = null; });
+      result = await pending;
     }
-    response.setHeader('Cache-Control', videos.length ? 's-maxage=300, stale-while-revalidate=600' : 'no-store');
-    response.status(200).json({ videos });
+    response.setHeader('Cache-Control', result.videos.length ? 's-maxage=300, stale-while-revalidate=600' : 'no-store');
+    response.status(200).json(result);
   } catch (error) {
     console.error('Could not fetch Rumble videos:', error);
     response.setHeader('Cache-Control', 'no-store');

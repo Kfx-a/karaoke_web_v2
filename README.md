@@ -14,5 +14,16 @@ Validación: `npx tsc --noEmit`, `npm run build` y
 
 El listado se extrae del JSON público incluido en la página del canal; si Rumble
 cambia ese formato, habrá que adaptar `api/rumble-videos.js`.
+Si Rumble rechaza las consultas desde Vercel (HTTP 403), el endpoint sirve el
+último catálogo guardado en `data/rumble-catalog.json`. Los iframes siguen
+reproduciendo directamente desde Rumble; el respaldo contiene solo metadatos.
+La respuesta de la API incluye `source` (`live` o `snapshot`) y `updated_at`.
+Las visitas del respaldo corresponden a la fecha de esa captura.
+
+Para incorporar videos nuevos al respaldo, ejecuta `npm run rumble:update`
+en local, guarda el JSON actualizado en un commit, súbelo y vuelve a desplegar.
+La actualización falla sin sobrescribir el catálogo si Rumble no responde.
+El build de Vercel usa el catálogo incluido y no necesita descargarlo de Rumble.
+
 La web necesita un servidor con el endpoint; publicar solo `dist/` en GitHub
 Pages no ejecuta esta API.
