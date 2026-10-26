@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { GlassCard } from './GlassCard';
 import { ChevronLeft, ChevronRight, Search, Sun, Moon } from 'lucide-react';
-import { fetchOdyseeVideos, fetchOdyseeViewCounts, sortByPriority, type OdyseeVideo } from '../services/odyseeService';
+import { fetchRumbleVideos, sortByPriority, type RumbleVideo } from '../services/rumbleService';
 
 const DESKTOP_VIDEOS_PER_PAGE = 16;
 const TABLET_VIDEOS_PER_PAGE = 12;
@@ -110,7 +110,7 @@ function getVideosPerPage(): number {
   return DESKTOP_VIDEOS_PER_PAGE;
 }
 
-async function preloadInitialThumbnails(videos: OdyseeVideo[]) {
+async function preloadInitialThumbnails(videos: RumbleVideo[]) {
   await Promise.all(videos.slice(0, getVideosPerPage()).map(video => preloadImage(video.thumbnail)));
 }
 
@@ -130,15 +130,17 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
   onInitialContentReady,
   onToggleTheme,
 }) => {
-  const [videos, setVideos] = useState<OdyseeVideo[]>([]);
+  const [videos, setVideos] = useState<RumbleVideo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVideo, setSelectedVideo] = useState<OdyseeVideo | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [selectedVideo, setSelectedVideo] = useState<RumbleVideo | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [initialCardsAnimated, setInitialCardsAnimated] = useState(false);
   const [pageDirection, setPageDirection] = useState<'next' | 'previous'>('next');
   const [pageTransitionPhase, setPageTransitionPhase] = useState<'idle' | 'sliding'>('idle');
-  const [outgoingPageVideos, setOutgoingPageVideos] = useState<OdyseeVideo[] | null>(null);
+  const [outgoingPageVideos, setOutgoingPageVideos] = useState<RumbleVideo[] | null>(null);
   const [videosPerPage, setVideosPerPage] = useState(getVideosPerPage);
 
   useEffect(() => {
@@ -164,10 +166,13 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
 
     const loadVideos = async () => {
       setLoading(true);
+      setLoadError(null);
       try {
-        const data = await fetchOdyseeVideos('@Alis_FX:f');
+        const data = await fetchRumbleVideos();
         await preloadInitialThumbnails(data);
         if (isMounted) setVideos(data);
+      } catch (error) {
+        if (isMounted) setLoadError(error instanceof Error ? error.message : "No se pudieron cargar los videos de Rumble.");
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -181,7 +186,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [onInitialContentReady]);
+  }, [onInitialContentReady, loadAttempt]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -206,26 +211,6 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
   const totalPages = Math.max(1, Math.ceil(filteredVideos.length / videosPerPage));
   const safePage = Math.min(currentPage, totalPages);
   const pageVideos = filteredVideos.slice((safePage - 1) * videosPerPage, safePage * videosPerPage);
-  const visibleVideoIds = pageVideos.map(video => video.id).join(',');
-
-  useEffect(() => {
-    if (loading || pageVideos.length === 0) return;
-
-    let cancelled = false;
-    fetchOdyseeViewCounts(pageVideos).then(viewCounts => {
-      if (cancelled || Object.keys(viewCounts).length === 0) return;
-
-      setVideos(currentVideos => currentVideos.map(video => (
-        viewCounts[video.id] === undefined
-          ? video
-          : { ...video, view_count: viewCounts[video.id] }
-      )));
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, safePage, visibleVideoIds]);
 
   const handlePageChange = (page: number) => {
     if (page === safePage || pageTransitionPhase !== 'idle') return;
@@ -248,7 +233,7 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
       ? undefined
       : 'grid-initial-hidden';
 
-  const renderCards = (items: OdyseeVideo[], animateInitialEntry = false) => {
+  const renderCards = (items: RumbleVideo[], animateInitialEntry = false) => {
     if (items.length === 0) {
       return (
         <div className="col-span-full py-20 text-center">
@@ -329,7 +314,14 @@ export const PlayerGrid: React.FC<PlayerGridProps> = ({
             <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={handlePageChange} isDark={isDark} />
           </div>
 
-        {!loading && (
+        {!loading && loadError && (
+          <div role="alert" className="py-20 text-center">
+            <p className={mutedText}>{loadError}</p>
+            <button className="mt-4 text-rose-500 underline" onClick={() => setLoadAttempt(attempt => attempt + 1)}>Reintentar</button>
+          </div>
+        )}
+
+        {!loading && !loadError && (
           <div className="scroll-mt-8">
             <div className={`grid-page-viewport ${pageTransitionPhase === 'sliding' ? 'grid-page-viewport-clipped' : ''}`}>
               {outgoingPageVideos && (

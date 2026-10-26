@@ -2,16 +2,14 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { ServerResponse } from 'node:http';
 import path from 'path';
-import odyseeVideosHandler from './api/odysee-videos.js';
-import odyseeViewCountsHandler from './api/odysee-view-counts.js';
+import rumbleVideosHandler from './api/rumble-videos.js';
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 
-function odyseeDevApi(): Plugin {
+function rumbleDevApi(): Plugin {
   return {
-    name: 'odysee-dev-api',
+    name: 'rumble-dev-api',
     configureServer(server) {
-      registerDevApiRoute(server, '/api/odysee-videos', odyseeVideosHandler, 'Could not fetch Odysee videos');
-      registerDevApiRoute(server, '/api/odysee-view-counts', odyseeViewCountsHandler, 'Could not fetch Odysee view counts');
+      registerDevApiRoute(server, '/api/rumble-videos', rumbleVideosHandler, 'Could not fetch Rumble videos');
     },
   };
 }
@@ -65,7 +63,7 @@ function createDevApiResponse(response: ServerResponse) {
 
 export default defineConfig({
   base: '/',
-  plugins: [react(), tailwindcss(), odyseeDevApi()],
+  plugins: [react(), tailwindcss(), rumbleDevApi()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
